@@ -49,7 +49,7 @@ function checkQuestion(item: unknown, no: number): string[] {
   return errors;
 }
 
-/** 올린 파일의 글자 내용을 검사합니다. 하나라도 틀리면 파일 전체를 받지 않습니다. */
+/** 문제지 파일의 글자 내용을 검사합니다. 하나라도 틀리면 문제지 전체를 쓰지 않습니다. */
 export function validateQuizText(text: string): ValidationResult {
   let data: unknown;
   try {
@@ -64,16 +64,20 @@ export function validateQuizText(text: string): ValidationResult {
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
     return { ok: false, errors: ["파일 안에 문제 목록(questions)이 없습니다."] };
   }
-  const list = (data as Record<string, unknown>).questions;
-  if (!Array.isArray(list)) {
-    return { ok: false, errors: ["파일 안에 문제 목록(questions)이 없습니다."] };
-  }
-  if (list.length === 0) {
-    return { ok: false, errors: ["파일에 문제가 하나도 없습니다."] };
-  }
+  const { title, questions: list } = data as Record<string, unknown>;
 
-  const errors = list.flatMap((item, i) => checkQuestion(item, i + 1));
-  if (errors.length > 0) {
+  const errors: string[] = [];
+  if (!isNonEmptyString(title)) {
+    errors.push("문제지 제목(title)이 없습니다.");
+  }
+  if (!Array.isArray(list)) {
+    errors.push("파일 안에 문제 목록(questions)이 없습니다.");
+  } else if (list.length === 0) {
+    errors.push("파일에 문제가 하나도 없습니다.");
+  } else {
+    errors.push(...list.flatMap((item, i) => checkQuestion(item, i + 1)));
+  }
+  if (errors.length > 0 || !Array.isArray(list)) {
     return { ok: false, errors };
   }
 
@@ -86,5 +90,5 @@ export function validateQuizText(text: string): ValidationResult {
       explanation: q.explanation,
     };
   });
-  return { ok: true, quiz: { questions } };
+  return { ok: true, quiz: { title: (title as string).trim(), questions } };
 }

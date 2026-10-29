@@ -6,7 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - 교육용 문제풀이 웹앱입니다. 요구사항 전체는 [PRD.md](PRD.md)에 있고, 모든 작업은 PRD.md를 기준으로 합니다.
 - 1일차 앱이 만들어져 있고, 로컬에서만 실행·확인했습니다. **아직 배포하지 않았습니다.** 배포는 사용자가 따로 요청할 때만 진행합니다. 임시 확인용 배포 주소도 만들지 않습니다.
-- `sample-questions.json`은 문제 파일 형식을 참고하고 테스트하는 데만 씁니다. 앱에 고정하거나 자동으로 불러오지 않습니다.
+- 버전 기록
+  - **초기 버전**: 학생이 JSON 파일을 직접 업로드했습니다. 커밋 `fc722c2`에 남아 있으며 지금은 폐지되었습니다.
+  - **현재 버전**: 홈 화면에서 `question-papers/` 폴더의 문제지 목록 중 하나를 고릅니다. 학생 업로드 기능은 없습니다.
+- 확인 작업을 위해 `question-papers/`에 임의의 문제지나 문항을 추가하지 않습니다. 여러 문제지 동작은 `parsePapers` 테스트처럼 메모리 안에서 점검합니다.
 - 작업 폴더가 OneDrive 동기화 폴더이고, 경로에 공백과 한글(`OneDrive - Teamus\바탕 화면`)이 들어 있습니다. 패키지 설치 중 파일 잠금 오류(`EBUSY`, `EPERM`)가 나면 OneDrive 동기화 때문일 수 있습니다.
 
 ## 명령어
@@ -14,42 +17,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run dev`: 개발용 실행, http://localhost:3000 (`.claude/launch.json`에 `quiz-app`으로 등록됨)
 - `npm run build`: 실제 배포용으로 만들기. TypeScript 검사도 함께 합니다.
 - `npm run lint`: 코드 검사
-- `npm test`: Vitest로 문제 파일 검사와 채점 로직 테스트
+- `npm test`: Vitest로 문제지 검사, 목록 정리, 채점 로직 테스트
 - 테스트 하나만 실행: `npx vitest run -t "테스트 이름 일부"`
 - `npx tsc --noEmit`만 따로 실행하면 `LayoutProps`를 찾지 못한다는 오류가 납니다. 이 타입은 Next가 dev/build할 때 만들어 주기 때문이므로, 타입 검사는 `npm run build`로 합니다.
 
 ## 구조
 
 - Next.js 16 (App Router, Turbopack) + Tailwind 4. 이 버전은 예전 Next와 다른 점이 있으므로, API가 확실하지 않으면 `node_modules/next/dist/docs/`를 먼저 읽습니다([AGENTS.md](AGENTS.md) 참고).
-- 서버, DB, 로그인이 없습니다. 올린 파일은 브라우저 안에서만 읽고 처리합니다.
+- DB와 로그인이 없습니다. `app/page.tsx`(서버 컴포넌트)가 `loadPapers()`로 `question-papers/*.json`을 읽어 클라이언트 컴포넌트 `QuizApp`에 넘깁니다. 정답도 함께 브라우저로 전달되며, 정답을 숨기는 보호 기능은 요청 범위가 아닙니다.
+- 문제지는 `readdirSync`/`readFileSync`로 동기적으로 읽으므로 **빌드할 때 페이지에 포함됩니다**(정적 페이지 `○ /`). `npm run dev`에서는 새로고침하면 바로 반영되지만, 배포본에서는 문제지를 추가하거나 고친 뒤 다시 빌드해야 합니다.
+- 폴더 경로는 반드시 `join(process.cwd(), "question-papers", ...)`처럼 고정된 형태로 적습니다. 경로를 변수로 넘기면 Turbopack이 "Dynamic filesystem access causes tracing of the whole project" 경고를 냅니다.
 - `lib/quiz/`: 화면과 분리된 로직입니다. 2일차에도 재사용할 수 있습니다.
-  - `types.ts`: 문제 형식
-  - `validate.ts`: 파일 검사. 하나라도 틀리면 파일 전체를 거부하고 문항 번호와 함께 쉬운 한국어 메시지를 돌려줍니다.
+  - `types.ts`: 문제지 형식(`title`, `questions`)과 `Paper`(+파일 이름 `id`)
+  - `validate.ts`: 문제지 검사. 하나라도 틀리면 문제지 전체를 쓰지 않고, 문항 번호와 함께 쉬운 한국어 메시지를 돌려줍니다.
+  - `papers.ts`: `loadPapers`(폴더 읽기, 서버 전용)와 `parsePapers`(검사, 제목 가나다순 정렬, 틀린 문제지 분리)
   - `score.ts`: 채점
-- `components/quiz/QuizApp.tsx`: 화면 단계(`upload → confirm → solving → result`)를 관리합니다. 채점은 제출할 때만 하므로 풀이 화면에는 정답 정보가 전달되지 않습니다.
+- `components/quiz/QuizApp.tsx`: 화면 단계(`list → solving → result`)를 관리합니다. 채점은 제출할 때만 하므로 풀이 화면에는 정답 여부가 표시되지 않습니다.
 
 ## 기술 구성 (PRD.md 기준)
 
 - Next.js + TypeScript, Vercel 배포, PC와 휴대폰 화면 모두 지원
-- 문제 파일: JSON, 최상위 `questions` 배열. 각 문항은 `question`, `options`(보기 4개), `correctAnswer`(1~4, 1이 첫 번째 보기), `explanation`
+- 문제지 파일: `question-papers/` 안의 JSON. 최상위에 `title`(목록에 표시할 제목)과 `questions` 배열을 둡니다. 각 문항은 `question`, `options`(보기 4개), `correctAnswer`(1~4, 1이 첫 번째 보기), `explanation`으로 구성합니다.
+- 문제지의 문제·보기·정답·해설은 사용자 요청 없이 바꾸지 않습니다.
 - 풀이 중에는 정답 여부·점수·해설을 숨기고, 모든 문항을 끝낸 뒤 한 번에 채점
 - 점수 = 정답 수 ÷ 전체 문항 수 × 100 (모든 문항 배점 같음)
 
 ## 지금 만들 기능과 나중 기능
 
-- **1일차 (지금)**: JSON 업로드, 문항 표시, 4지선다 풀이, 완료 후 채점·점수·정오·해설, 로컬 실행, Vercel 배포
+- **1일차 (지금)**: 문제지 목록 표시와 선택, 4지선다 풀이, 완료 후 채점·점수·정오·해설, 로컬 실행, Vercel 배포(요청 시)
 - **2일차 (나중)**: 교사 Google 로그인과 학생 이름 기반 게스트 입장, Azure AI 문제 생성, 문제 저장·공개, Firestore 결과 저장, 교사용 성적 조회
 - 1일차에는 로그인·AI 문제 생성·DB 저장을 만들지 않습니다. 2일차에 기능을 붙이기 쉬운 구조로 만들되, 2일차 기능을 미리 구현하지 않습니다.
-- 예시 문항을 앱에 고정해서 보여주는 것만으로는 완료가 아닙니다. 이용자가 직접 파일을 올려서 풀 수 있어야 합니다.
 
-## 사용자가 정한 사항 (1일차)
+## 사용자가 정한 사항 (현재 버전)
 
-- 형식이 틀린 파일은 전체를 받지 않고, 몇 번 문제의 무엇이 틀렸는지 알려줍니다.
-- 풀이 중에 '이전' 버튼으로 돌아가 답을 바꿀 수 있습니다. 답을 고르지 않으면 '다음'으로 넘어갈 수 없습니다.
+- 목록에서 문제지를 누르면 바로 1번 문제가 나옵니다. 문항 확인 화면은 없습니다.
+- 목록에는 제목과 문항 수를 보여주고, 제목 가나다순으로 정렬합니다.
+- 형식이 틀린 문제지는 목록에서 빼고, 목록 아래에 파일 이름과 틀린 이유를 보여줍니다.
+- 풀이 중에 '이전' 버튼으로 돌아가 답을 바꿀 수 있습니다. 답을 고르지 않으면 '다음'으로 넘어갈 수 없습니다. 이 경우 따로 안내 문구는 띄우지 않습니다.
 - 점수는 정수로 반올림합니다. 예: 2/3 → 67점
-- 문항 확인 화면에는 파일 이름과 문항 수만 보여주고, 문제 내용은 미리 보여주지 않습니다.
-- 결과 화면에는 점수, 정오, 해설과 함께 내가 고른 답과 정답을 보여줍니다. '다시 풀기'와 '다른 파일 올리기' 버튼은 넣지 않고, 처음으로 가려면 새로고침합니다.
-- 예시 파일 내려받기 기능은 넣지 않습니다.
+- 결과 화면에는 점수, 정오, 해설과 함께 내가 고른 답과 정답을 보여줍니다. '다시 풀기' 버튼은 넣지 않고, 처음으로 가려면 새로고침합니다.
 
 ## 아직 정해지지 않은 사항
 

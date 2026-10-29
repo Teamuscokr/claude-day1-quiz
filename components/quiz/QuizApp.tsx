@@ -1,45 +1,41 @@
 "use client";
 
 import { useState } from "react";
+import type { PaperList } from "@/lib/quiz/papers";
 import { gradeQuiz, type ScoreResult } from "@/lib/quiz/score";
-import type { Answers, QuizFile } from "@/lib/quiz/types";
-import ConfirmStep from "./ConfirmStep";
+import type { Answers, Paper } from "@/lib/quiz/types";
+import PaperListStep from "./PaperListStep";
 import ResultStep from "./ResultStep";
 import SolveStep from "./SolveStep";
-import UploadStep from "./UploadStep";
 
 type Step =
-  | { name: "upload" }
-  | { name: "confirm"; quiz: QuizFile; fileName: string }
-  | { name: "solving"; quiz: QuizFile }
+  | { name: "list" }
+  | { name: "solving"; paper: Paper }
   | { name: "result"; result: ScoreResult };
 
-export default function QuizApp() {
-  const [step, setStep] = useState<Step>({ name: "upload" });
+export default function QuizApp({ papers, problems }: PaperList) {
+  const [step, setStep] = useState<Step>({ name: "list" });
 
   switch (step.name) {
-    case "upload":
+    case "list":
       return (
-        <UploadStep
-          onLoaded={(quiz, fileName) => setStep({ name: "confirm", quiz, fileName })}
-        />
-      );
-    case "confirm":
-      return (
-        <ConfirmStep
-          fileName={step.fileName}
-          count={step.quiz.questions.length}
-          onStart={() => setStep({ name: "solving", quiz: step.quiz })}
-          onBack={() => setStep({ name: "upload" })}
+        <PaperListStep
+          papers={papers}
+          problems={problems}
+          onSelect={(paper) => {
+            setStep({ name: "solving", paper });
+            window.scrollTo({ top: 0 });
+          }}
         />
       );
     case "solving":
       return (
         <SolveStep
-          questions={step.quiz.questions}
-          onSubmit={(answers: Answers) =>
-            setStep({ name: "result", result: gradeQuiz(step.quiz.questions, answers) })
-          }
+          questions={step.paper.questions}
+          onSubmit={(answers: Answers) => {
+            setStep({ name: "result", result: gradeQuiz(step.paper.questions, answers) });
+            window.scrollTo({ top: 0 });
+          }}
         />
       );
     case "result":
