@@ -69,11 +69,13 @@ describe("validateQuizText", () => {
 });
 
 describe("loadPapers", () => {
-  it("question-papers 폴더의 예시 문제지를 읽는다", () => {
+  it("question-papers 폴더의 문제지를 모두 오류 없이 읽는다", () => {
     const { papers, problems } = loadPapers();
     expect(problems).toEqual([]);
-    expect(papers.map((p) => [p.id, p.title, p.questions.length])).toEqual([
-      ["sample-questions.json", "중학교 정보과목", 10],
+    expect(papers.map((p) => [p.id, p.title, p.questions.length])).toContainEqual([
+      "sample-questions.json",
+      "중학교 정보과목",
+      10,
     ]);
   });
 
