@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f1f5f9;
+  --foreground: #0f172a;
+  --muted: #475569;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family:
+    "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl bg-white p-5 shadow-sm sm:p-8;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    @apply inline-flex min-h-12 cursor-pointer items-center justify-center rounded-xl px-6 font-semibold transition-colors;
+    @apply disabled:cursor-not-allowed disabled:opacity-40;
+    @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600;
+  }
+
+  .btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700 disabled:hover:bg-blue-600;
+  }
+
+  .btn-secondary {
+    @apply border-2 border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:hover:bg-white;
+  }
+
+  /* 파일 선택 버튼(label) 안의 숨긴 입력칸에 키보드 초점이 가면 버튼에 표시 */
+  .btn-primary:has(input:focus-visible) {
+    @apply outline-2 outline-offset-2 outline-blue-600;
+  }
+}
