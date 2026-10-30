@@ -21,5 +21,15 @@ export type Paper = QuizFile & {
   id: string;
 };
 
+/** 학생에게 보내는 문항. 정답과 해설은 빼고 보냅니다(채점은 서버에서). */
+export type PublicQuestion = Pick<Question, "question" | "options">;
+
+/** 학생 목록에 보이는 공개 문제지. id는 Firestore 문서 id */
+export type PublicPaper = {
+  id: string;
+  title: string;
+  questions: PublicQuestion[];
+};
+
 /** 문항 순서대로 이용자가 고른 보기 번호(1~4). 아직 고르지 않았으면 null */
 export type Answers = (number | null)[];

@@ -1,13 +1,11 @@
-import type { PaperProblem } from "@/lib/quiz/papers";
-import type { Paper } from "@/lib/quiz/types";
+import type { PublicPaper } from "@/lib/quiz/types";
 
 type Props = {
-  papers: Paper[];
-  problems: PaperProblem[];
-  onSelect: (paper: Paper) => void;
+  papers: PublicPaper[];
+  onSelect: (paper: PublicPaper) => void;
 };
 
-export default function PaperListStep({ papers, problems, onSelect }: Props) {
+export default function PaperListStep({ papers, onSelect }: Props) {
   return (
     <section className="card">
       <h1 className="text-2xl font-bold">문제풀이</h1>
@@ -18,7 +16,9 @@ export default function PaperListStep({ papers, problems, onSelect }: Props) {
       </p>
 
       {papers.length === 0 ? (
-        <p className="mt-6 rounded-xl bg-slate-50 p-4 text-muted">아직 준비된 문제지가 없습니다.</p>
+        <p className="mt-6 rounded-xl bg-slate-50 p-4 text-muted">
+          아직 공개된 문제지가 없습니다. 선생님이 문제지를 공개하면 여기에 보입니다.
+        </p>
       ) : (
         <ul className="mt-6 space-y-3">
           {papers.map((paper) => (
@@ -34,24 +34,6 @@ export default function PaperListStep({ papers, problems, onSelect }: Props) {
             </li>
           ))}
         </ul>
-      )}
-
-      {problems.length > 0 && (
-        <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          <p className="font-semibold">열 수 없는 문제지가 있습니다.</p>
-          <ul className="mt-2 space-y-2">
-            {problems.map(({ fileName, errors }) => (
-              <li key={fileName}>
-                <span className="break-all font-medium">{fileName}</span>
-                <ul className="mt-1 list-disc pl-5">
-                  {errors.map((message) => (
-                    <li key={message}>{message}</li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        </div>
       )}
     </section>
   );

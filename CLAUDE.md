@@ -5,11 +5,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 프로젝트 현재 상태
 
 - 교육용 문제풀이 웹앱입니다. 요구사항 전체는 [PRD.md](PRD.md)에 있고, 모든 작업은 PRD.md를 기준으로 합니다.
-- 1일차 앱이 만들어져 있고, 로컬에서만 실행·확인했습니다. **아직 배포하지 않았습니다.** 배포는 사용자가 따로 요청할 때만 진행합니다. 임시 확인용 배포 주소도 만들지 않습니다.
+- 1일차 앱(교사·학생 역할 화면 추가 전)이 Vercel 프로젝트 `claude-day1-quiz`(팀 teamus3)에 배포되어 있습니다: https://claude-day1-quiz.vercel.app . 교사·학생 화면 분리는 아직 배포하지 않았습니다. 배포는 사용자가 따로 요청할 때만 진행하고, 임시 확인용 배포 주소도 만들지 않습니다.
+- Vercel 명령은 Claude 앱의 터미널 탭(`run_in_terminal`)에서 실행합니다. Claude의 PowerShell/Bash 도구는 `AppData\Roaming`이 앱 전용 공간으로 바뀌어 있어, 그 안의 Vercel 로그인 정보가 실제 사용자 것과 다릅니다.
 - 버전 기록
   - **초기 버전**: 학생이 JSON 파일을 직접 업로드했습니다. 커밋 `fc722c2`에 남아 있으며 지금은 폐지되었습니다.
-  - **현재 버전**: 홈 화면에서 `question-papers/` 폴더의 문제지 목록 중 하나를 고릅니다. 학생 업로드 기능은 없습니다.
-- 확인 작업을 위해 `question-papers/`에 임의의 문제지나 문항을 추가하지 않습니다. 여러 문제지 동작은 `parsePapers` 테스트처럼 메모리 안에서 점검합니다.
+  - **폴더 목록 버전**: 학생이 `question-papers/` 폴더의 문제지 목록에서 골랐습니다. 커밋 `7dd260a`.
+  - **현재 버전**: 교사가 JSON 문제지를 올려 Firestore에 저장·공개하고, 학생은 공개된 문제지만 풉니다. `question-papers/`의 파일은 교사가 올릴 예시 파일로만 남아 있고 학생 목록에는 직접 나오지 않습니다.
+- 확인 작업을 위해 `question-papers/`에 임의의 문제지나 문항을 추가하지 않습니다. 여러 문제지 동작은 `parsePapers` 테스트처럼 메모리 안에서 점검합니다. Firestore에 확인용 데이터를 넣었다면 확인 뒤 지웁니다(예시 파일과 중복 검사에 걸리기 때문).
 - 작업 폴더가 OneDrive 동기화 폴더이고, 경로에 공백과 한글(`OneDrive - Teamus\바탕 화면`)이 들어 있습니다. 패키지 설치 중 파일 잠금 오류(`EBUSY`, `EPERM`)가 나면 OneDrive 동기화 때문일 수 있습니다.
 
 ## 명령어
@@ -24,15 +26,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 구조
 
 - Next.js 16 (App Router, Turbopack) + Tailwind 4. 이 버전은 예전 Next와 다른 점이 있으므로, API가 확실하지 않으면 `node_modules/next/dist/docs/`를 먼저 읽습니다([AGENTS.md](AGENTS.md) 참고).
-- DB와 로그인이 없습니다. `app/page.tsx`(서버 컴포넌트)가 `loadPapers()`로 `question-papers/*.json`을 읽어 클라이언트 컴포넌트 `QuizApp`에 넘깁니다. 정답도 함께 브라우저로 전달되며, 정답을 숨기는 보호 기능은 요청 범위가 아닙니다.
-- 문제지는 `readdirSync`/`readFileSync`로 동기적으로 읽으므로 **빌드할 때 페이지에 포함됩니다**(정적 페이지 `○ /`). `npm run dev`에서는 새로고침하면 바로 반영되지만, 배포본에서는 문제지를 추가하거나 고친 뒤 다시 빌드해야 합니다.
-- 폴더 경로는 반드시 `join(process.cwd(), "question-papers", ...)`처럼 고정된 형태로 적습니다. 경로를 변수로 넘기면 Turbopack이 "Dynamic filesystem access causes tracing of the whole project" 경고를 냅니다.
+- 화면은 주소별로 나뉩니다.
+  - `app/page.tsx`(`/`): '교사로 시작하기'·'학생으로 시작하기'를 고르는 첫 화면
+  - `app/teacher/page.tsx`(`/teacher`): `components/teacher/TeacherApp`이 Firebase Google 로그인(팝업)을 처리합니다. 로그인 후 ID 토큰을 `/api/teacher/session`에 보내 서버가 허용 교사인지 확인해야 `TeacherDashboard`(`PaperUpload` 문제지 올리기, 공개/비공개 버튼, `ResultsTable` 결과표·평균)를 보여줍니다.
+  - 서버 검사: `lib/teacher/verify.ts`의 `verifyTeacher`가 `jose`로 Google 공개키를 써서 토큰을 검증하고(서비스 계정 비밀키 없음), 이메일을 환경변수 `TEACHER_EMAIL`(`.env.local`, 교사 1명)과 비교합니다. 앞으로 만드는 교사용 서버 기능도 처리 전에 반드시 이 함수를 거칩니다. Vercel에 배포할 때는 Vercel 환경변수에도 `TEACHER_EMAIL`이 있어야 하고, Firebase 로그인 허용 도메인에 배포 주소를 추가해야 합니다.
+  - Firebase: 프로젝트 `claude-day1-quiz`, 웹 앱 `claude-day1-quiz-web`(무료 Spark 요금제). 예전 프로젝트 `quiz-day2`는 쓰지 않고 그대로 둡니다. Google 로그인은 `firebase.json`에 `auth.providers.googleSignIn`(oAuthBrandDisplayName "문제풀이", supportEmail = 교사 이메일, authorizedRedirectUris `https://claude-day1-quiz.firebaseapp.com/__/auth/handler`)을 적고 터미널 탭에서 `firebase deploy --only auth --project claude-day1-quiz`로 켰습니다(앱 배포가 아니라 Firebase 로그인 설정만 바꿈). 저장소가 공개라 이메일이 올라가지 않도록, 켠 뒤에는 `firebase.json`에서 `auth` 부분을 뺐습니다. 다시 적용해야 하면 잠시 넣었다가 빼세요. CLI로 만든 이 프로젝트에는 `localhost`가 로그인 허용 도메인에 기본으로 없었으므로 직접 추가했습니다. 지금 허용 도메인은 `claude-day1-quiz.firebaseapp.com`, `claude-day1-quiz.web.app`, `localhost`이고, Vercel 주소는 아직 없습니다. 공개 설정값은 `lib/firebase/config.ts`에 있습니다.
+  - `app/student/page.tsx`(`/student`): `StudentApp`에서 이름을 입력하면(브라우저에 저장하지 않음) `QuizApp`이 `/api/student/papers`에서 공개 문제지(정답·해설 제외)를 받아옵니다. 최종 제출 때 `/api/student/results`가 서버에서 채점·저장하고 그 학생의 결과(정답·해설 포함)만 돌려줍니다. 저장 실패 시 '다시 시도'로 같은 답을 다시 보냅니다.
+- Firestore(서울 `asia-northeast3`, 무료 요금제)
+  - `firestore.rules`는 브라우저의 직접 읽기·쓰기를 모두 막습니다(`allow read, write: if false`). 모든 접근은 서버 Route Handler → `lib/firebase/store.ts`(Admin SDK)로만 합니다. 규칙은 터미널 탭에서 `firebase deploy --only firestore:rules --project claude-day1-quiz`로 올립니다.
+  - 컬렉션: `papers`(title, titleKey, contentHash, questions, published), `results`(문서 id `{paperId}__{인코딩한 이름}`, 같은 이름은 덮어써서 최신 결과만 남음)
+  - 중복 문제지: 제목(`titleKey`)이 같거나 문항 내용 해시(`contentHash`)가 같으면 409로 거절합니다.
+  - 교사용 Route Handler(`app/api/teacher/**`)는 처음에 `rejectUnlessTeacher`(`lib/server/http.ts`)를 부릅니다.
+  - 서버용 키: `lib/firebase/admin.ts`가 `FIREBASE_SERVICE_ACCOUNT_JSON`(Vercel용, 키 내용) 또는 `GOOGLE_APPLICATION_CREDENTIALS`(내 컴퓨터용, `.env.local`에 키 파일 경로)를 읽습니다. 키 파일은 프로젝트 폴더 밖(`C:\Users\YoonKeumJae\.firebase-keys\`)에 두고, 내용을 열거나 출력하지 않습니다. 키가 없으면 API가 "서버 저장소 설정이 아직 끝나지 않았습니다"를 돌려줍니다.
+  - `GET /api/student/papers`는 요청을 읽지 않으므로 `connection()`으로 빌드 때 미리 만들지 않게 했습니다(Cache Components 사용 중).
 - `lib/quiz/`: 화면과 분리된 로직입니다. 2일차에도 재사용할 수 있습니다.
-  - `types.ts`: 문제지 형식(`title`, `questions`)과 `Paper`(+파일 이름 `id`)
-  - `validate.ts`: 문제지 검사. 하나라도 틀리면 문제지 전체를 쓰지 않고, 문항 번호와 함께 쉬운 한국어 메시지를 돌려줍니다.
-  - `papers.ts`: `loadPapers`(폴더 읽기, 서버 전용)와 `parsePapers`(검사, 제목 가나다순 정렬, 틀린 문제지 분리)
-  - `score.ts`: 채점
-- `components/quiz/QuizApp.tsx`: 화면 단계(`list → solving → result`)를 관리합니다. 채점은 제출할 때만 하므로 풀이 화면에는 정답 여부가 표시되지 않습니다.
+  - `types.ts`: 문제지 형식(`title`, `questions`), 학생용 `PublicQuestion`/`PublicPaper`(정답·해설 없음)
+  - `validate.ts`: 문제지 검사. 하나라도 틀리면 문제지 전체를 쓰지 않고, 문항 번호와 함께 쉬운 한국어 메시지를 돌려줍니다. 교사 업로드 때 화면과 서버에서 모두 씁니다.
+  - `records.ts`: 이름·제목 정리, 중복 비교 키, 답 검사, 틀린 문항, 평균
+  - `papers.ts`: `loadPapers`/`parsePapers`. 지금은 화면에서 쓰지 않고 예시 파일 검사 테스트에만 씁니다.
+  - `score.ts`: 채점(서버에서만 실행)
+- `components/quiz/QuizApp.tsx`: 화면 단계(`loading → list → solving → submitting/submitFailed → result`)를 관리합니다.
+- `lib/client/api.ts`의 `callApi`: 화면에서 서버를 부를 때 쓰고, 실패하면 서버가 보낸 쉬운 안내 문구를 돌려줍니다.
 
 ## 기술 구성 (PRD.md 기준)
 

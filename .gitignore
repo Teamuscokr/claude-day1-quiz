@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel
+.env*
+
+# 서버용 Firebase 키 파일이 실수로 프로젝트 폴더에 들어와도 올라가지 않게
+*firebase-adminsdk*.json

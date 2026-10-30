@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { Answers, Question } from "@/lib/quiz/types";
+import type { Answers, PublicQuestion } from "@/lib/quiz/types";
 
 type Props = {
-  questions: Question[];
+  /** 정답·해설이 없는 문항. 채점은 제출 뒤 서버에서 합니다. */
+  questions: PublicQuestion[];
   onSubmit: (answers: Answers) => void;
 };
 
